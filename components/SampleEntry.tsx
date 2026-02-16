@@ -3,9 +3,13 @@ import React, { useState } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { SampleJob, Staff, ActionType } from '../types';
-import { AlertCircle, CheckCircle2, Package, Trash2, Zap, ArrowRight, Lock, Key } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Box, Info, Trash2, FlaskConical, ChevronRight, Lock } from 'lucide-react';
 
-interface Props { staff: Staff[]; jobs: SampleJob[]; onComplete: () => void; }
+interface Props {
+  staff: Staff[];
+  jobs: SampleJob[];
+  onComplete: () => void;
+}
 
 const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
   const [jobNo, setJobNo] = useState('');
@@ -13,119 +17,275 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
   const [selectedStaff, setSelectedStaff] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Hidden Dev/Test Mode States
   const [isTestMode, setIsTestMode] = useState(false);
   const [showDevOptions, setShowDevOptions] = useState(false);
   const [headerClicks, setHeaderClicks] = useState(0);
-  const [successData, setSuccessData] = useState<any>(null);
+
+  const [successData, setSuccessData] = useState<{ jobNo: string, slotId: string, action: ActionType } | null>(null);
 
   const handleHeaderClick = () => {
-    if (headerClicks + 1 >= 5) { setShowDevOptions(!showDevOptions); setHeaderClicks(0); }
-    else { setHeaderClicks(headerClicks + 1); }
+    const newClicks = headerClicks + 1;
+    if (newClicks >= 5) {
+      setShowDevOptions(!showDevOptions);
+      setHeaderClicks(0);
+    } else {
+      setHeaderClicks(newClicks);
+    }
+  };
+
+  const findAvailableSlot = (type: ActionType): string | null => {
+    const prefix = type === 'DISPOSE' ? 'D' : 'R';
+    const pendingJobs = jobs.filter(j => j.status === 'PENDING');
+
+    for (let i = 1; i <= 10; i++) {
+      const slotId = `${prefix}${i}`;
+      const count = pendingJobs.filter(j => j.slotId === slotId).length;
+      if (count < 10) {
+        return slotId;
+      }
+    }
+    return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!jobNo || !selectedStaff) { setError('กรุณาระบุข้อมูลให้ครบถ้วน'); return; }
-
-    const prefix = action === 'DISPOSE' ? 'D' : 'R';
-    const pendingJobs = jobs.filter(j => j.status === 'PENDING');
-    let assignedSlotId = null;
-
-    for (let i = 1; i <= 10; i++) {
-      const sid = `${prefix}${i}`;
-      if (pendingJobs.filter(j => j.slotId === sid).length < 10) { assignedSlotId = sid; break; }
+    setError('');
+    
+    if (!jobNo || !selectedStaff) {
+      setError('กรุณากรอกเลขที่ใบงานและเลือกชื่อพนักงาน');
+      return;
     }
 
-    if (!assignedSlotId) { setError('พื้นที่จัดเก็บเต็มทุกช่องแล้ว'); return; }
+    const assignedSlotId = findAvailableSlot(action);
+    if (!assignedSlotId) {
+      setError(`คลังเก็บสำหรับการ ${action === 'DISPOSE' ? 'ทิ้ง' : 'ส่งคืน'} เต็มทุกช่องแล้ว`);
+      return;
+    }
 
     setLoading(true);
     try {
-      const now = Date.now();
+      const entryDate = Date.now();
+      // Test Mode: makes deadline in the past or now
+      const deadlineDate = isTestMode 
+        ? entryDate - (1000 * 60) // 1 minute ago
+        : entryDate + (12 * 24 * 60 * 60 * 1000);
+
       await addDoc(collection(db, "jobs"), {
         jobNo: jobNo.trim().toUpperCase(),
-        action, slotId: assignedSlotId,
-        entryDate: isTestMode ? now - (13 * 86400000) : now,
-        deadlineDate: isTestMode ? now - 60000 : now + (12 * 86400000),
-        staffName: selectedStaff, status: 'PENDING'
+        customerName: '',
+        action,
+        returnAddress: '',
+        slotId: assignedSlotId,
+        entryDate: isTestMode ? entryDate - (13 * 24 * 60 * 60 * 1000) : entryDate,
+        deadlineDate,
+        staffName: selectedStaff,
+        status: 'PENDING'
       });
-      setSuccessData({ jobNo, slotId: assignedSlotId, action });
-    } catch (err) { setError('ระบบขัดข้อง กรุณาลองใหม่'); }
-    finally { setLoading(false); }
+
+      setSuccessData({ 
+        jobNo: jobNo.trim().toUpperCase(), 
+        slotId: assignedSlotId,
+        action: action 
+      });
+    } catch (err) {
+      console.error(err);
+      setError('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (successData) return (
-    <div className="max-w-sm mx-auto animate-reveal">
-      <div className="bg-white rounded-[3rem] shadow-2xl p-10 text-center border border-slate-100">
-        <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-8 ${successData.action === 'DISPOSE' ? 'bg-rose-50 text-rose-500' : 'bg-indigo-50 text-indigo-500'}`}>
-          <CheckCircle2 size={48} strokeWidth={2.5} />
-        </div>
-        <h2 className="text-3xl font-black text-slate-900 mb-2">เรียบร้อย!</h2>
-        <p className="text-slate-400 text-sm font-bold mb-10 uppercase tracking-widest">ระบบจัดเก็บในตำแหน่ง:</p>
-        
-        <div className={`text-7xl font-black mb-10 tracking-tighter ${successData.action === 'DISPOSE' ? 'text-rose-600' : 'text-indigo-600'}`}>
-          {successData.slotId}
-        </div>
+  const resetForm = () => {
+    setJobNo('');
+    setSuccessData(null);
+  };
 
-        <button onClick={() => { setJobNo(''); setSuccessData(null); }} className="w-full py-5 bg-slate-900 text-white rounded-[1.8rem] font-black text-lg shadow-xl shadow-slate-200 active:scale-95 transition-all">
-          บันทึกรายการถัดไป
-        </button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="max-w-md mx-auto space-y-8">
-      <div className="text-center" onClick={handleHeaderClick}>
-        <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-2">บันทึกใบงาน</h2>
-        <div className="h-1 w-10 bg-indigo-600 mx-auto rounded-full"></div>
-      </div>
-
-      <div className="bg-white/70 backdrop-blur-2xl rounded-[3rem] shadow-2xl shadow-indigo-100/50 p-8 border border-white">
-        <form onSubmit={handleSubmit} className="space-y-7">
-          {error && <div className="bg-rose-50 text-rose-600 p-4 rounded-2xl flex items-center gap-3 border border-rose-100 text-xs font-bold animate-pulse"><AlertCircle size={16}/> {error}</div>}
-
-          <div className="space-y-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Job Number</label>
-              <input type="text" value={jobNo} onChange={e => setJobNo(e.target.value)} placeholder="00000000" className="w-full px-6 py-5 text-2xl font-black rounded-[1.8rem] bg-slate-50 border-none focus:ring-4 focus:ring-indigo-100 transition-all outline-none" required inputMode="numeric"/>
+  if (successData) {
+    const isDispose = successData.action === 'DISPOSE';
+    return (
+      <div className="max-w-md mx-auto py-4 animate-fadeIn">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden text-center">
+          <div className={`${isDispose ? 'bg-red-500' : 'bg-blue-600'} p-12 text-white flex flex-col items-center`}>
+            <div className="bg-white/20 p-4 rounded-3xl mb-4 backdrop-blur-md">
+              <CheckCircle2 size={56} />
+            </div>
+            <h2 className="text-3xl font-black tracking-tight">บันทึกเรียบร้อย!</h2>
+          </div>
+          
+          <div className="p-8 space-y-8">
+            <div className="space-y-4">
+              <p className="text-gray-400 font-black uppercase tracking-[0.2em] text-[10px]">
+                วางใบงาน {successData.jobNo} ที่ช่อง
+              </p>
+              
+              <div className={`mx-auto w-32 h-32 rounded-[2rem] flex flex-col items-center justify-center shadow-lg ${
+                isDispose ? 'bg-red-50 text-red-600 shadow-red-100' : 'bg-blue-50 text-blue-600 shadow-blue-100'
+              }`}>
+                <span className="text-5xl font-black tracking-tighter">{successData.slotId}</span>
+              </div>
+              
+              <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                isDispose ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
+              }`}>
+                {isDispose ? 'Dispose (โซนทิ้ง)' : 'Return (โซนส่งคืน)'}
+              </div>
             </div>
 
-            <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Authorizer</label>
-              <select value={selectedStaff} onChange={e => setSelectedStaff(e.target.value)} className="w-full px-6 py-5 rounded-[1.8rem] bg-slate-50 font-bold text-slate-700 appearance-none border-none focus:ring-4 focus:ring-indigo-100 transition-all outline-none" required>
-                <option value="">เลือกพนักงาน</option>
-                {staff.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            <div className="bg-slate-50 p-6 rounded-3xl border border-gray-100 text-sm font-medium text-slate-500 leading-relaxed">
+               ระบบคำนวณวันพักตัวอย่างให้ <span className="text-slate-900 font-bold">12 วัน</span> อัตโนมัติแล้ว
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={resetForm}
+                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-lg hover:bg-black transition-all shadow-xl active:scale-95"
+              >
+                บันทึกใบงานต่อไป
+              </button>
+              <button
+                onClick={onComplete}
+                className="w-full py-3 text-slate-400 font-bold text-sm hover:text-slate-600 flex items-center justify-center gap-1"
+              >
+                ดูความเคลื่อนไหวล่าสุด <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-md mx-auto space-y-6">
+      <div className="text-center space-y-2 select-none">
+        <h2 
+          onClick={handleHeaderClick}
+          className="text-3xl font-black text-slate-900 tracking-tight cursor-pointer active:opacity-50 transition-opacity"
+        >
+          รับตัวอย่างใหม่
+        </h2>
+        <p className="text-slate-500 text-sm font-medium">กรอกข้อมูลเพื่อรันเลขที่ช่องเก็บอัตโนมัติ</p>
+      </div>
+
+      <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden transition-all duration-300">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {error && (
+            <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center gap-3 border border-red-100">
+              <AlertTriangle size={18} className="shrink-0" />
+              <span className="text-xs font-bold">{error}</span>
+            </div>
+          )}
+
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">เลขที่ใบงาน (Job No.)</label>
+              <input 
+                type="text"
+                value={jobNo}
+                onChange={(e) => setJobNo(e.target.value)}
+                className="w-full px-5 py-5 text-2xl font-mono font-black rounded-2xl border-2 border-slate-100 focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all outline-none bg-slate-50/50"
+                placeholder="2603XXXX"
+                autoFocus
+                required
+                inputMode="numeric"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">พนักงานผู้คีย์</label>
+              <select 
+                value={selectedStaff}
+                onChange={(e) => setSelectedStaff(e.target.value)}
+                className="w-full px-5 py-5 rounded-2xl border-2 border-slate-100 focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all outline-none bg-white font-bold text-lg text-slate-700 appearance-none shadow-sm"
+                required
+              >
+                <option value="">-- เลือกชื่อพนักงาน --</option>
+                {staff.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
               </select>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Process Type</label>
+          <div className="space-y-3 pt-2">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">เลือกประเภทการจัดการ</label>
             <div className="grid grid-cols-2 gap-4">
-              <button type="button" onClick={() => setAction('DISPOSE')} className={`py-6 rounded-[1.8rem] border-2 transition-all flex flex-col items-center gap-1 ${action === 'DISPOSE' ? 'bg-rose-600 border-rose-600 text-white shadow-xl shadow-rose-200' : 'bg-white border-slate-100 text-slate-300'}`}>
-                <Trash2 size={20} /> <span className="text-[10px] font-black uppercase">ทิ้ง (D)</span>
+              <button
+                type="button"
+                onClick={() => setAction('DISPOSE')}
+                className={`py-6 rounded-[1.5rem] border-2 transition-all font-black flex flex-col items-center justify-center gap-2 ${
+                  action === 'DISPOSE' 
+                  ? 'bg-red-50 border-red-500 text-red-600 shadow-lg shadow-red-50 scale-[1.05]' 
+                  : 'bg-white border-slate-100 text-slate-300 hover:border-slate-200'
+                }`}
+              >
+                <Trash2 size={24} strokeWidth={3} /> 
+                <span className="text-sm">ทิ้ง (D)</span>
               </button>
-              <button type="button" onClick={() => setAction('RETURN')} className={`py-6 rounded-[1.8rem] border-2 transition-all flex flex-col items-center gap-1 ${action === 'RETURN' ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-200' : 'bg-white border-slate-100 text-slate-300'}`}>
-                <Package size={20} /> <span className="text-[10px] font-black uppercase">ส่งคืน (R)</span>
+              <button
+                type="button"
+                onClick={() => setAction('RETURN')}
+                className={`py-6 rounded-[1.5rem] border-2 transition-all font-black flex flex-col items-center justify-center gap-2 ${
+                  action === 'RETURN' 
+                  ? 'bg-blue-50 border-blue-500 text-blue-600 shadow-lg shadow-blue-50 scale-[1.05]' 
+                  : 'bg-white border-slate-100 text-slate-300 hover:border-slate-200'
+                }`}
+              >
+                <Box size={24} strokeWidth={3} /> 
+                <span className="text-sm">ส่งคืน (R)</span>
               </button>
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className={`w-full py-6 rounded-[2rem] text-white font-black text-xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-2xl ${loading ? 'bg-slate-300' : 'bg-slate-900 hover:bg-black shadow-slate-200'}`}>
-            {loading ? <Zap className="animate-spin"/> : 'ยืนยันบันทึก'} <ArrowRight size={20} />
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full py-5 rounded-[1.5rem] text-white font-black text-xl shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 ${
+              loading ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'
+            }`}
+          >
+            {loading ? 'กำลังบันทึก...' : <>บันทึกรับงาน <ChevronRight size={24} strokeWidth={3} /></>}
           </button>
 
+          {/* Secret Test Mode - Only appears when triggered */}
           {showDevOptions && (
-            <div className="pt-4 animate-reveal">
-              <label className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 text-slate-500 cursor-pointer">
-                <input type="checkbox" checked={isTestMode} onChange={e => setIsTestMode(e.target.checked)} className="w-4 h-4 rounded-full accent-indigo-600" />
-                <span className="text-[10px] font-black uppercase tracking-widest flex-1">Engineering Mode (Skip 12d)</span>
-                <Lock size={12} onClick={() => setShowDevOptions(false)}/>
+            <div className="pt-4 border-t border-dashed animate-fadeIn">
+              <label className="flex items-center gap-4 cursor-pointer p-4 rounded-2xl bg-slate-100 text-slate-600 active:bg-slate-200 transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={isTestMode}
+                  onChange={(e) => setIsTestMode(e.target.checked)}
+                  className="w-5 h-5 rounded-lg accent-amber-500"
+                />
+                <div className="flex-1">
+                  <div className="text-[11px] font-black flex items-center gap-2 uppercase tracking-tight">
+                    <FlaskConical size={14} className="text-amber-500" /> โหมดทดสอบ (ข้าม 12 วัน)
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setShowDevOptions(false)}
+                  className="p-1 text-slate-400"
+                >
+                  <Lock size={14} />
+                </button>
               </label>
             </div>
           )}
         </form>
       </div>
+      
+      <div className="flex items-center justify-center gap-2 text-slate-400">
+         <Info size={14} />
+         <span className="text-[10px] font-bold uppercase tracking-widest">ความจุ: สูงสุด 10 ใบงานต่อช่อง</span>
+      </div>
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+      `}</style>
     </div>
   );
 };

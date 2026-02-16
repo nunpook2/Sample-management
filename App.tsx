@@ -1,6 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { 
+  collection, 
+  onSnapshot, 
+  query, 
+  orderBy
+} from 'firebase/firestore';
 import { db } from './firebase';
 import { SampleJob, Staff } from './types';
 import Dashboard from './components/Dashboard';
@@ -8,9 +13,16 @@ import SampleEntry from './components/SampleEntry';
 import SlotGrid from './components/SlotGrid';
 import DeadlineList from './components/DeadlineList';
 import Settings from './components/Settings';
-import { LayoutGrid, Plus, Layout, History, Settings as SettingsIcon, ShieldCheck } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  PlusCircle, 
+  Package, 
+  Clock, 
+  Settings as SettingsIcon
+} from 'lucide-react';
 
 const App: React.FC = () => {
+  // Set initial tab to 'entry' as requested
   const [activeTab, setActiveTab] = useState<'dashboard' | 'entry' | 'slots' | 'deadlines' | 'settings'>('entry');
   const [jobs, setJobs] = useState<SampleJob[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -19,54 +31,75 @@ const App: React.FC = () => {
   useEffect(() => {
     const qJobs = query(collection(db, "jobs"), orderBy("entryDate", "desc"));
     const unsubJobs = onSnapshot(qJobs, (snapshot) => {
-      setJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SampleJob)));
+      const jobData: SampleJob[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SampleJob));
+      setJobs(jobData);
       setLoading(false);
     });
-    const unsubStaff = onSnapshot(query(collection(db, "staff")), (snapshot) => {
-      setStaff(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff)));
+
+    const qStaff = query(collection(db, "staff"));
+    const unsubStaff = onSnapshot(qStaff, (snapshot) => {
+      const staffData: Staff[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
+      setStaff(staffData);
     });
-    return () => { unsubJobs(); unsubStaff(); };
+
+    return () => {
+      unsubJobs();
+      unsubStaff();
+    };
   }, []);
 
-  const overdueCount = jobs.filter(j => j.status === 'PENDING' && j.deadlineDate < Date.now()).length;
+  const pendingJobs = jobs.filter(j => j.status === 'PENDING');
+  const overdueCount = pendingJobs.filter(j => j.deadlineDate < Date.now()).length;
 
-  const NavButton = ({ id, icon: Icon, label, badge }: any) => {
+  const NavItem = ({ id, icon: Icon, label, badge }: { id: any, icon: any, label: string, badge?: number }) => {
     const isActive = activeTab === id;
     return (
-      <button onClick={() => setActiveTab(id)} className={`relative flex flex-col items-center justify-center flex-1 transition-all duration-500 ${isActive ? 'text-indigo-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}>
-        <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'drop-shadow-md' : ''} />
-        <span className={`text-[9px] mt-1 font-extrabold uppercase tracking-tighter transition-all ${isActive ? 'opacity-100' : 'opacity-40'}`}>{label}</span>
-        {badge > 0 && <span className="absolute top-0 right-1/2 translate-x-4 bg-rose-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-white">{badge}</span>}
+      <button
+        onClick={() => setActiveTab(id)}
+        className={`flex flex-col items-center justify-center flex-1 py-2 transition-all relative ${
+          isActive ? 'text-blue-600' : 'text-gray-400'
+        }`}
+      >
+        <div className={`p-1 rounded-xl transition-all ${isActive ? 'bg-blue-50' : ''}`}>
+          <Icon size={isActive ? 24 : 22} strokeWidth={isActive ? 2.5 : 2} />
+        </div>
+        <span className={`text-[10px] mt-1 font-bold ${isActive ? 'opacity-100' : 'opacity-70'}`}>
+          {label}
+        </span>
+        {badge !== undefined && badge > 0 && (
+          <span className="absolute top-1 right-1/2 translate-x-4 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white min-w-[18px]">
+            {badge}
+          </span>
+        )}
       </button>
     );
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-40 px-6 py-5 bg-white/60 backdrop-blur-xl border-b border-slate-200/50 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-xl shadow-indigo-200 rotate-3 transition-transform hover:rotate-0">
-            <ShieldCheck size={20} strokeWidth={2.5} />
+    <div className="flex flex-col min-h-screen bg-slate-50">
+      {/* Header - Simple & Clean for Mobile */}
+      <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-20 shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="bg-blue-600 p-1.5 rounded-lg text-white shadow-lg shadow-blue-100">
+            <Package size={18} />
           </div>
-          <div>
-            <h1 className="text-base font-extrabold text-slate-900 tracking-tight leading-none uppercase">LabMaster</h1>
-            <span className="text-[10px] text-indigo-500 font-bold tracking-widest uppercase">Premium Edition</span>
-          </div>
+          <h1 className="text-lg font-black text-gray-800 tracking-tight">LabMaster</h1>
         </div>
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 rounded-full text-[9px] font-black text-white uppercase tracking-widest shadow-lg shadow-slate-200">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
-          Live Control
-        </div>
+        {activeTab === 'entry' && (
+           <div className="text-[10px] px-2 py-1 bg-green-50 text-green-600 rounded-full font-bold uppercase tracking-widest">
+             Online
+           </div>
+        )}
       </header>
 
-      <main className="flex-1 pb-32 pt-6 px-4 max-w-5xl mx-auto w-full">
+      {/* Main Content Area */}
+      <main className="flex-1 pb-24 overflow-y-auto">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-            <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Secure Handshaking...</p>
+          <div className="flex items-center justify-center h-[60vh]">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
           </div>
         ) : (
-          <div className="animate-reveal">
+          <div className="p-4 md:p-8 animate-fadeIn max-w-4xl mx-auto">
             {activeTab === 'dashboard' && <Dashboard jobs={jobs} />}
             {activeTab === 'entry' && <SampleEntry staff={staff} jobs={jobs} onComplete={() => setActiveTab('dashboard')} />}
             {activeTab === 'slots' && <SlotGrid jobs={jobs} staff={staff} />}
@@ -76,23 +109,36 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md h-20 bg-slate-900/95 backdrop-blur-2xl rounded-[2.5rem] flex items-center px-4 shadow-2xl z-50 border border-white/10 overflow-visible">
-        <NavButton id="dashboard" icon={Layout} label="Stat" />
-        <NavButton id="slots" icon={LayoutGrid} label="Slots" />
-        
-        <div className="relative -top-8 px-2">
-          <button onClick={() => setActiveTab('entry')} className={`w-16 h-16 rounded-[1.8rem] flex items-center justify-center transition-all duration-500 shadow-2xl ${activeTab === 'entry' ? 'bg-white text-indigo-600 rotate-90 scale-110 shadow-indigo-500/30' : 'bg-indigo-600 text-white hover:scale-110 shadow-indigo-600/40'}`}>
-            <Plus size={36} strokeWidth={3} />
-          </button>
+      {/* Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-gray-100 px-2 pb-safe-area flex items-center h-20 z-30 shadow-[0_-5px_20px_-10px_rgba(0,0,0,0.1)]">
+        <NavItem id="dashboard" icon={LayoutDashboard} label="แผงควบคุม" />
+        <NavItem id="slots" icon={Package} label="ผังที่เก็บ" />
+        <div className="flex flex-col items-center justify-center flex-1 -mt-8">
+           <button 
+             onClick={() => setActiveTab('entry')}
+             className={`w-14 h-14 rounded-2xl shadow-xl flex items-center justify-center transition-all active:scale-90 ${
+               activeTab === 'entry' ? 'bg-blue-600 text-white shadow-blue-200' : 'bg-white text-gray-400 border border-gray-100'
+             }`}
+           >
+             <PlusCircle size={32} />
+           </button>
+           <span className={`text-[10px] mt-2 font-bold ${activeTab === 'entry' ? 'text-blue-600' : 'text-gray-400'}`}>เพิ่มใบงาน</span>
         </div>
-
-        <NavButton id="deadlines" icon={History} label="Queue" badge={overdueCount} />
-        <NavButton id="settings" icon={SettingsIcon} label="Prefs" />
+        <NavItem id="deadlines" icon={Clock} label="รอจัดการ" badge={overdueCount} />
+        <NavItem id="settings" icon={SettingsIcon} label="ตั้งค่า" />
       </nav>
 
       <style>{`
-        @keyframes reveal { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-reveal { animation: reveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .pb-safe-area {
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
       `}</style>
     </div>
   );
