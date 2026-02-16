@@ -1,0 +1,5 @@
+{
+  "name": "LabSample Master",
+  "description": "A comprehensive laboratory sample disposal and return management system with 12-day holding periods, slot capacity tracking, and automated deadline notifications.",
+  "requestFramePermissions": []
+}
