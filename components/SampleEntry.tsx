@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { SampleJob, Staff, ActionType } from '../types';
-import { AlertTriangle, CheckCircle2, Box, Info, Trash2, FlaskConical, ChevronRight, Lock } from 'lucide-react';
+import { PlusCircle, AlertTriangle, CheckCircle2, Box, Info, Trash2, FlaskConical, ChevronRight } from 'lucide-react';
 
 interface Props {
   staff: Staff[];
@@ -17,23 +17,8 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
   const [selectedStaff, setSelectedStaff] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  // Hidden Dev/Test Mode States
   const [isTestMode, setIsTestMode] = useState(false);
-  const [showDevOptions, setShowDevOptions] = useState(false);
-  const [headerClicks, setHeaderClicks] = useState(0);
-
   const [successData, setSuccessData] = useState<{ jobNo: string, slotId: string, action: ActionType } | null>(null);
-
-  const handleHeaderClick = () => {
-    const newClicks = headerClicks + 1;
-    if (newClicks >= 5) {
-      setShowDevOptions(!showDevOptions);
-      setHeaderClicks(0);
-    } else {
-      setHeaderClicks(newClicks);
-    }
-  };
 
   const findAvailableSlot = (type: ActionType): string | null => {
     const prefix = type === 'DISPOSE' ? 'D' : 'R';
@@ -67,9 +52,8 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
     setLoading(true);
     try {
       const entryDate = Date.now();
-      // Test Mode: makes deadline in the past or now
       const deadlineDate = isTestMode 
-        ? entryDate - (1000 * 60) // 1 minute ago
+        ? entryDate - (1000 * 60 * 60 * 24)
         : entryDate + (12 * 24 * 60 * 60 * 1000);
 
       await addDoc(collection(db, "jobs"), {
@@ -159,17 +143,12 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
 
   return (
     <div className="max-w-md mx-auto space-y-6">
-      <div className="text-center space-y-2 select-none">
-        <h2 
-          onClick={handleHeaderClick}
-          className="text-3xl font-black text-slate-900 tracking-tight cursor-pointer active:opacity-50 transition-opacity"
-        >
-          รับตัวอย่างใหม่
-        </h2>
+      <div className="text-center space-y-2">
+        <h2 className="text-3xl font-black text-slate-900 tracking-tight">รับตัวอย่างใหม่</h2>
         <p className="text-slate-500 text-sm font-medium">กรอกข้อมูลเพื่อรันเลขที่ช่องเก็บอัตโนมัติ</p>
       </div>
 
-      <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden transition-all duration-300">
+      <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
             <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center gap-3 border border-red-100">
@@ -239,6 +218,26 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
             </div>
           </div>
 
+          {/* Test Mode Toggle - Slightly smaller on mobile */}
+          <div className="pt-2">
+            <label className="flex items-center gap-4 cursor-pointer p-4 rounded-2xl bg-slate-900 text-white active:bg-black transition-colors">
+              <input 
+                type="checkbox" 
+                checked={isTestMode}
+                onChange={(e) => setIsTestMode(e.target.checked)}
+                className="w-6 h-6 rounded-lg accent-blue-500"
+              />
+              <div className="flex-1">
+                <div className="text-xs font-black flex items-center gap-2">
+                  <FlaskConical size={14} className="text-blue-400" /> โหมดทดสอบระบบ
+                </div>
+                <div className="text-[9px] text-gray-400 uppercase font-black tracking-widest mt-0.5">
+                  ข้ามวันพัก 12 วันทันที
+                </div>
+              </div>
+            </label>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -248,32 +247,6 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
           >
             {loading ? 'กำลังบันทึก...' : <>บันทึกรับงาน <ChevronRight size={24} strokeWidth={3} /></>}
           </button>
-
-          {/* Secret Test Mode - Only appears when triggered */}
-          {showDevOptions && (
-            <div className="pt-4 border-t border-dashed animate-fadeIn">
-              <label className="flex items-center gap-4 cursor-pointer p-4 rounded-2xl bg-slate-100 text-slate-600 active:bg-slate-200 transition-colors">
-                <input 
-                  type="checkbox" 
-                  checked={isTestMode}
-                  onChange={(e) => setIsTestMode(e.target.checked)}
-                  className="w-5 h-5 rounded-lg accent-amber-500"
-                />
-                <div className="flex-1">
-                  <div className="text-[11px] font-black flex items-center gap-2 uppercase tracking-tight">
-                    <FlaskConical size={14} className="text-amber-500" /> โหมดทดสอบ (ข้าม 12 วัน)
-                  </div>
-                </div>
-                <button 
-                  type="button" 
-                  onClick={() => setShowDevOptions(false)}
-                  className="p-1 text-slate-400"
-                >
-                  <Lock size={14} />
-                </button>
-              </label>
-            </div>
-          )}
         </form>
       </div>
       
@@ -281,11 +254,6 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
          <Info size={14} />
          <span className="text-[10px] font-bold uppercase tracking-widest">ความจุ: สูงสุด 10 ใบงานต่อช่อง</span>
       </div>
-
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
-      `}</style>
     </div>
   );
 };
