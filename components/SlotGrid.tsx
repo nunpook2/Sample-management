@@ -82,25 +82,23 @@ const SlotGrid: React.FC<Props> = ({ jobs, staff }) => {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      try {
-        updateJob(processingJob.id, {
-          status: 'COMPLETED',
-          exitDate: Date.now(),
-          exitStaff: exitStaff,
-          recipient: '-', 
-          notes: notes || 'จัดการปกติ'
-        });
-        setProcessingJob(null);
-        setExitStaff('');
-        setNotes('');
-      } catch (err) {
-        console.error(err);
-        alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
+    try {
+      await updateJob(processingJob.id, {
+        status: 'COMPLETED',
+        exitDate: Date.now(),
+        exitStaff: exitStaff,
+        recipient: '-', 
+        notes: notes || 'จัดการปกติ'
+      });
+      setProcessingJob(null);
+      setExitStaff('');
+      setNotes('');
+    } catch (err) {
+      console.error(err);
+      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const SlotCard: React.FC<{ type: ActionType; num: number }> = ({ type, num }) => {

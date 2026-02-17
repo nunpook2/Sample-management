@@ -17,6 +17,8 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
+  const [showTestModeUI, setShowTestModeUI] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
   const [successData, setSuccessData] = useState<{ jobNo: string, slotId: string, action: ActionType } | null>(null);
 
   const findAvailableSlot = (type: ActionType): string | null => {
@@ -31,6 +33,15 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
       }
     }
     return null;
+  };
+
+  const handleTitleTap = () => {
+    const newCount = tapCount + 1;
+    setTapCount(newCount);
+    if (newCount >= 5) {
+      setShowTestModeUI(prev => !prev);
+      setTapCount(0);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,38 +60,36 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
     }
 
     setLoading(true);
-    // Simulate slight delay for UX
-    setTimeout(() => {
-      try {
-        const entryDate = Date.now();
-        const deadlineDate = isTestMode 
-          ? entryDate - (1000 * 60 * 60 * 24)
-          : entryDate + (12 * 24 * 60 * 60 * 1000);
+    
+    try {
+      const entryDate = Date.now();
+      const deadlineDate = isTestMode 
+        ? entryDate - (1000 * 60 * 60 * 24)
+        : entryDate + (12 * 24 * 60 * 60 * 1000);
 
-        addJob({
-          jobNo: jobNo.trim().toUpperCase(),
-          customerName: '',
-          action,
-          returnAddress: '',
-          slotId: assignedSlotId,
-          entryDate: isTestMode ? entryDate - (13 * 24 * 60 * 60 * 1000) : entryDate,
-          deadlineDate,
-          staffName: selectedStaff,
-          status: 'PENDING'
-        });
+      await addJob({
+        jobNo: jobNo.trim().toUpperCase(),
+        customerName: '',
+        action,
+        returnAddress: '',
+        slotId: assignedSlotId,
+        entryDate: isTestMode ? entryDate - (13 * 24 * 60 * 60 * 1000) : entryDate,
+        deadlineDate,
+        staffName: selectedStaff,
+        status: 'PENDING'
+      });
 
-        setSuccessData({ 
-          jobNo: jobNo.trim().toUpperCase(), 
-          slotId: assignedSlotId,
-          action: action 
-        });
-      } catch (err) {
-        console.error(err);
-        setError('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-      } finally {
-        setLoading(false);
-      }
-    }, 500);
+      setSuccessData({ 
+        jobNo: jobNo.trim().toUpperCase(), 
+        slotId: assignedSlotId,
+        action: action 
+      });
+    } catch (err) {
+      console.error(err);
+      setError('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetForm = () => {
@@ -145,8 +154,10 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
 
   return (
     <div className="max-w-md mx-auto space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-black text-slate-900 tracking-tight">รับตัวอย่างใหม่</h2>
+      <div className="text-center space-y-2 select-none" onClick={handleTitleTap}>
+        <h2 className="text-3xl font-black text-slate-900 tracking-tight active:text-slate-700 transition-colors cursor-pointer">
+          รับตัวอย่างใหม่
+        </h2>
         <p className="text-slate-500 text-sm font-medium">กรอกข้อมูลเพื่อรันเลขที่ช่องเก็บอัตโนมัติ</p>
       </div>
 
@@ -220,25 +231,27 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
             </div>
           </div>
 
-          {/* Test Mode Toggle */}
-          <div className="pt-2">
-            <label className="flex items-center gap-4 cursor-pointer p-4 rounded-2xl bg-slate-900 text-white active:bg-black transition-colors">
-              <input 
-                type="checkbox" 
-                checked={isTestMode}
-                onChange={(e) => setIsTestMode(e.target.checked)}
-                className="w-6 h-6 rounded-lg accent-blue-500"
-              />
-              <div className="flex-1">
-                <div className="text-xs font-black flex items-center gap-2">
-                  <FlaskConical size={14} className="text-blue-400" /> โหมดทดสอบระบบ
+          {/* Secret Test Mode Toggle */}
+          {showTestModeUI && (
+            <div className="pt-2 animate-fadeIn">
+              <label className="flex items-center gap-4 cursor-pointer p-4 rounded-2xl bg-slate-900 text-white active:bg-black transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={isTestMode}
+                  onChange={(e) => setIsTestMode(e.target.checked)}
+                  className="w-6 h-6 rounded-lg accent-blue-500"
+                />
+                <div className="flex-1">
+                  <div className="text-xs font-black flex items-center gap-2">
+                    <FlaskConical size={14} className="text-blue-400" /> โหมดทดสอบระบบ
+                  </div>
+                  <div className="text-[9px] text-gray-400 uppercase font-black tracking-widest mt-0.5">
+                    ข้ามวันพัก 12 วันทันที
+                  </div>
                 </div>
-                <div className="text-[9px] text-gray-400 uppercase font-black tracking-widest mt-0.5">
-                  ข้ามวันพัก 12 วันทันที
-                </div>
-              </div>
-            </label>
-          </div>
+              </label>
+            </div>
+          )}
 
           <button
             type="submit"

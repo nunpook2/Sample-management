@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { getJobs, getStaff, storageEvent } from './storage';
+import { getJobs, getStaff, storageEvent, initDB } from './storage';
 import { SampleJob, Staff } from './types';
 import Dashboard from './components/Dashboard';
 import SampleEntry from './components/SampleEntry';
@@ -23,15 +23,25 @@ const App: React.FC = () => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = () => {
-    setJobs(getJobs());
-    setStaff(getStaff());
-    setLoading(false);
+  const fetchData = async () => {
+    try {
+      const [fetchedJobs, fetchedStaff] = await Promise.all([getJobs(), getStaff()]);
+      setJobs(fetchedJobs);
+      setStaff(fetchedStaff);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    // Initial fetch
-    fetchData();
+    const init = async () => {
+      await initDB();
+      await fetchData();
+    };
+
+    init();
 
     // Listen for changes from storage.ts
     const handleDataChange = () => fetchData();
@@ -77,7 +87,7 @@ const App: React.FC = () => {
           <div className="bg-blue-600 p-1.5 rounded-lg text-white shadow-lg shadow-blue-100">
             <Package size={18} />
           </div>
-          <h1 className="text-lg font-black text-gray-800 tracking-tight">LabMaster (Local)</h1>
+          <h1 className="text-lg font-black text-gray-800 tracking-tight">LabMaster (Cloud)</h1>
         </div>
         
         <div className="flex items-center gap-2">
@@ -98,8 +108,9 @@ const App: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 pb-24 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-[60vh]">
+          <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
+            <p className="text-sm font-bold text-gray-400">Connecting to Cloud Database...</p>
           </div>
         ) : (
           <div className="p-4 md:p-8 animate-fadeIn max-w-4xl mx-auto">

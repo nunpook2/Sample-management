@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { addStaff, updateStaff, deleteStaff, clearAllJobs } from '../storage';
 import { Staff } from '../types';
-import { UserPlus, Trash2, Users, Info, ShieldAlert, RefreshCw, Edit2, Check, X, AlertCircle } from 'lucide-react';
+import { UserPlus, Trash2, Users, Info, ShieldAlert, RefreshCw, Edit2, Check, X, AlertCircle, Cloud } from 'lucide-react';
 
 interface Props { staff: Staff[]; }
 
@@ -23,14 +23,12 @@ const Settings: React.FC<Props> = ({ staff }) => {
     e.preventDefault();
     if (!newName.trim()) return;
     setLoading(true);
-    setTimeout(() => {
-      try {
-        addStaff(newName.trim());
-        setNewName('');
-      } catch (err) {
-        alert('ไม่สามารถเพิ่มรายชื่อได้');
-      } finally { setLoading(false); }
-    }, 200);
+    try {
+      await addStaff(newName.trim());
+      setNewName('');
+    } catch (err) {
+      alert('ไม่สามารถเพิ่มรายชื่อได้');
+    } finally { setLoading(false); }
   };
 
   const startEdit = (s: Staff) => {
@@ -42,48 +40,42 @@ const Settings: React.FC<Props> = ({ staff }) => {
   const handleUpdateStaff = async (id: string) => {
     if (!editValue.trim()) return;
     setLoading(true);
-    setTimeout(() => {
-      try {
-        updateStaff(id, editValue.trim());
-        setEditingId(null);
-      } catch (err) {
-        alert('แก้ไขไม่สำเร็จ');
-      } finally { setLoading(false); }
-    }, 200);
+    try {
+      await updateStaff(id, editValue.trim());
+      setEditingId(null);
+    } catch (err) {
+      alert('แก้ไขไม่สำเร็จ');
+    } finally { setLoading(false); }
   };
 
   const handleDeleteStaff = async (id: string) => {
     setLoading(true);
-    setTimeout(() => {
-      try {
-        deleteStaff(id);
-        setConfirmDeleteId(null);
-      } catch (err) {
-        alert('ลบไม่สำเร็จ');
-      } finally { setLoading(false); }
-    }, 200);
+    try {
+      await deleteStaff(id);
+      setConfirmDeleteId(null);
+    } catch (err) {
+      alert('ลบไม่สำเร็จ');
+    } finally { setLoading(false); }
   };
 
   const handleClearAllJobs = async () => {
     setClearing(true);
-    setTimeout(() => {
-      try {
-        clearAllJobs();
-        alert(`ล้างข้อมูลสำเร็จแล้ว`);
-        setConfirmClearStage(0);
-      } catch (err) {
-        alert('เกิดข้อผิดพลาดในการล้างข้อมูล');
-      } finally {
-        setClearing(false);
-      }
-    }, 1000);
+    try {
+      await clearAllJobs();
+      alert(`ล้างข้อมูลสำเร็จแล้ว`);
+      setConfirmClearStage(0);
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการล้างข้อมูล');
+    } finally {
+      setClearing(false);
+    }
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-10 pb-20">
       <header className="px-2">
         <h2 className="text-2xl font-bold text-gray-800">การตั้งค่าระบบ</h2>
-        <p className="text-gray-500">จัดการรายชื่อเจ้าหน้าที่และล้างข้อมูลระบบ (Local Storage)</p>
+        <p className="text-gray-500">จัดการรายชื่อเจ้าหน้าที่และล้างข้อมูลระบบ (Cloud Database)</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -175,10 +167,10 @@ const Settings: React.FC<Props> = ({ staff }) => {
         <section className="space-y-6">
           <div className="bg-blue-600 rounded-[2.5rem] p-8 text-white shadow-2xl">
             <h3 className="font-black text-xl flex items-center gap-2 mb-4 uppercase tracking-tight">
-              <Info size={24} /> เกี่ยวกับระบบ (Offline)
+              <Cloud size={24} /> เกี่ยวกับระบบ (Cloud)
             </h3>
             <ul className="space-y-3 text-sm font-bold opacity-90">
-              <li className="bg-white/10 p-4 rounded-2xl">• ข้อมูลเก็บในเครื่อง (LocalStorage)</li>
+              <li className="bg-white/10 p-4 rounded-2xl">• ข้อมูลเก็บที่ Turso (LibSQL)</li>
               <li className="bg-white/10 p-4 rounded-2xl">• Prefix D = ทิ้ง (Dispose)</li>
               <li className="bg-white/10 p-4 rounded-2xl">• Prefix R = ส่งคืน (Return)</li>
               <li className="bg-white/10 p-4 rounded-2xl">• สูงสุด 10 ใบงานต่อช่อง</li>
@@ -190,7 +182,7 @@ const Settings: React.FC<Props> = ({ staff }) => {
               <ShieldAlert size={24} /> โซนอันตราย
             </h3>
             <p className="text-xs text-red-600 mb-6 font-bold opacity-70">
-              จะลบใบงาน "ทั้งหมด" จากเครื่องนี้
+              จะลบใบงาน "ทั้งหมด" จาก Database ถาวร
             </p>
             
             <div className="space-y-3">
@@ -247,9 +239,9 @@ const Settings: React.FC<Props> = ({ staff }) => {
           </div>
 
           <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm text-center">
-            <div className="inline-flex items-center gap-2 text-green-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
-              Local Storage Mode
+            <div className="inline-flex items-center gap-2 text-blue-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></div>
+              Cloud Database Mode
             </div>
           </div>
         </section>

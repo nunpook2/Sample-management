@@ -65,23 +65,21 @@ const DeadlineList: React.FC<Props> = ({ jobs, staff }) => {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      try {
-        updateJob(processingJob.id, {
-          status: 'COMPLETED',
-          exitDate: Date.now(),
-          exitStaff: exitStaff,
-          recipient: '-', 
-          notes: notes || 'จัดการตามกำหนด 12 วัน'
-        });
-        setProcessingJob(null);
-      } catch (err) {
-        console.error(err);
-        alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
+    try {
+      await updateJob(processingJob.id, {
+        status: 'COMPLETED',
+        exitDate: Date.now(),
+        exitStaff: exitStaff,
+        recipient: '-', 
+        notes: notes || 'จัดการตามกำหนด 12 วัน'
+      });
+      setProcessingJob(null);
+    } catch (err) {
+      console.error(err);
+      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

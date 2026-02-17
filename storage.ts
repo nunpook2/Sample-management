@@ -1,91 +1,191 @@
 
+import { createClient } from "@libsql/client";
 import { SampleJob, Staff } from './types';
 
-const JOBS_KEY = 'lab_master_jobs_v1';
-const STAFF_KEY = 'lab_master_staff_v1';
+// Configuration
+// Note: In a production environment, never expose keys in client-side code.
+const TURSO_URL = 'https://sample-management-chaiyapat.aws-ap-south-1.turso.io';
+const TURSO_AUTH_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzEzMDM0MjEsImlkIjoiN2YxMGVjNjctNjdlZi00M2IwLTliNDYtNTJlZWRmNjU1YzRmIiwicmlkIjoiNWM2ZWI2YjQtYmI0Ny00M2NhLWJkMzctMzZlMmJhMTQxODJhIn0.lY6T-GNRRMXStfjd8fvBZvK3gYJGGyBXJAFaduxXdUkCZ4SlT2B1gDNTja8SIrpYXfsVsltj9xuZ8T4V8aVFCw';
 
-// Event emitter to simulate real-time updates
+const client = createClient({
+  url: TURSO_URL,
+  authToken: TURSO_AUTH_TOKEN,
+});
+
+// Event emitter for real-time updates
 export const storageEvent = new EventTarget();
-
 const notifyChange = () => {
   storageEvent.dispatchEvent(new Event('data-change'));
 };
 
+// --- INITIALIZATION ---
+
+export const initDB = async () => {
+  try {
+    // Create jobs table
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS jobs (
+        id TEXT PRIMARY KEY,
+        jobNo TEXT,
+        customerName TEXT,
+        action TEXT,
+        returnAddress TEXT,
+        slotId TEXT,
+        entryDate INTEGER,
+        deadlineDate INTEGER,
+        staffName TEXT,
+        status TEXT,
+        exitDate INTEGER,
+        exitStaff TEXT,
+        recipient TEXT,
+        notes TEXT
+      )
+    `);
+
+    // Create staff table
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS staff (
+        id TEXT PRIMARY KEY,
+        name TEXT
+      )
+    `);
+    
+    console.log("Database initialized");
+  } catch (e) {
+    console.error("Failed to initialize database:", e);
+  }
+};
+
 // --- JOBS ---
 
-export const getJobs = (): SampleJob[] => {
+export const getJobs = async (): Promise<SampleJob[]> => {
   try {
-    const data = localStorage.getItem(JOBS_KEY);
-    return data ? JSON.parse(data) : [];
+    const result = await client.execute("SELECT * FROM jobs ORDER BY entryDate DESC");
+    return result.rows.map(row => ({
+      id: row.id as string,
+      jobNo: row.jobNo as string,
+      customerName: row.customerName as string || '',
+      action: row.action as any,
+      returnAddress: row.returnAddress as string || '',
+      slotId: row.slotId as string,
+      entryDate: Number(row.entryDate),
+      deadlineDate: Number(row.deadlineDate),
+      staffName: row.staffName as string,
+      status: row.status as any,
+      exitDate: row.exitDate ? Number(row.exitDate) : undefined,
+      exitStaff: row.exitStaff as string || undefined,
+      recipient: row.recipient as string || undefined,
+      notes: row.notes as string || undefined
+    }));
   } catch (e) {
     console.error("Error loading jobs", e);
     return [];
   }
 };
 
-export const addJob = (job: Omit<SampleJob, 'id'>) => {
-  const jobs = getJobs();
-  const newJob: SampleJob = {
-    ...job,
-    id: Date.now().toString(36) + Math.random().toString(36).substr(2)
-  };
-  jobs.unshift(newJob); // Add to top
-  localStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
-  notifyChange();
-  return newJob;
-};
-
-export const updateJob = (id: string, updates: Partial<SampleJob>) => {
-  const jobs = getJobs();
-  const index = jobs.findIndex(j => j.id === id);
-  if (index !== -1) {
-    jobs[index] = { ...jobs[index], ...updates };
-    localStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
+export const addJob = async (job: Omit<SampleJob, 'id'>) => {
+  const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
+  try {
+    await client.execute({
+      sql: `INSERT INTO jobs (
+        id, jobNo, customerName, action, returnAddress, slotId, 
+        entryDate, deadlineDate, staffName, status, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        id, job.jobNo, job.customerName || '', job.action, job.returnAddress || '', job.slotId,
+        job.entryDate, job.deadlineDate, job.staffName, job.status, job.notes || ''
+      ]
+    });
     notifyChange();
+    return { ...job, id };
+  } catch (e) {
+    console.error("Error adding job", e);
+    throw e;
   }
 };
 
-export const clearAllJobs = () => {
-  localStorage.removeItem(JOBS_KEY);
-  notifyChange();
+export const updateJob = async (id: string, updates: Partial<SampleJob>) => {
+  try {
+    // Construct dynamic update query
+    const keys = Object.keys(updates);
+    if (keys.length === 0) return;
+
+    const setClause = keys.map(key => `${key} = ?`).join(', ');
+    const args = [...Object.values(updates), id];
+
+    await client.execute({
+      sql: `UPDATE jobs SET ${setClause} WHERE id = ?`,
+      args: args as any[]
+    });
+    notifyChange();
+  } catch (e) {
+    console.error("Error updating job", e);
+    throw e;
+  }
+};
+
+export const clearAllJobs = async () => {
+  try {
+    await client.execute("DELETE FROM jobs");
+    notifyChange();
+  } catch (e) {
+    console.error("Error clearing jobs", e);
+    throw e;
+  }
 };
 
 // --- STAFF ---
 
-export const getStaff = (): Staff[] => {
+export const getStaff = async (): Promise<Staff[]> => {
   try {
-    const data = localStorage.getItem(STAFF_KEY);
-    return data ? JSON.parse(data) : [];
+    const result = await client.execute("SELECT * FROM staff ORDER BY name ASC");
+    return result.rows.map(row => ({
+      id: row.id as string,
+      name: row.name as string
+    }));
   } catch (e) {
+    console.error("Error loading staff", e);
     return [];
   }
 };
 
-export const addStaff = (name: string) => {
-  const staff = getStaff();
-  const newStaff: Staff = {
-    id: Date.now().toString(),
-    name
-  };
-  staff.push(newStaff);
-  localStorage.setItem(STAFF_KEY, JSON.stringify(staff));
-  notifyChange();
-  return newStaff;
-};
-
-export const updateStaff = (id: string, name: string) => {
-  const staff = getStaff();
-  const index = staff.findIndex(s => s.id === id);
-  if (index !== -1) {
-    staff[index].name = name;
-    localStorage.setItem(STAFF_KEY, JSON.stringify(staff));
+export const addStaff = async (name: string) => {
+  const id = Date.now().toString();
+  try {
+    await client.execute({
+      sql: "INSERT INTO staff (id, name) VALUES (?, ?)",
+      args: [id, name]
+    });
     notifyChange();
+    return { id, name };
+  } catch (e) {
+    console.error("Error adding staff", e);
+    throw e;
   }
 };
 
-export const deleteStaff = (id: string) => {
-  const staff = getStaff();
-  const newStaff = staff.filter(s => s.id !== id);
-  localStorage.setItem(STAFF_KEY, JSON.stringify(newStaff));
-  notifyChange();
+export const updateStaff = async (id: string, name: string) => {
+  try {
+    await client.execute({
+      sql: "UPDATE staff SET name = ? WHERE id = ?",
+      args: [name, id]
+    });
+    notifyChange();
+  } catch (e) {
+    console.error("Error updating staff", e);
+    throw e;
+  }
+};
+
+export const deleteStaff = async (id: string) => {
+  try {
+    await client.execute({
+      sql: "DELETE FROM staff WHERE id = ?",
+      args: [id]
+    });
+    notifyChange();
+  } catch (e) {
+    console.error("Error deleting staff", e);
+    throw e;
+  }
 };
