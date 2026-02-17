@@ -3,14 +3,29 @@ import { createClient } from "@libsql/client";
 import { SampleJob, Staff } from './types';
 
 // Configuration
-// Note: In a production environment, never expose keys in client-side code.
-const TURSO_URL = 'https://sample-management-chaiyapat.aws-ap-south-1.turso.io';
+const TURSO_URL = 'libsql://sample-management-chaiyapat.aws-ap-south-1.turso.io';
 const TURSO_AUTH_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzEzMDM0MjEsImlkIjoiN2YxMGVjNjctNjdlZi00M2IwLTliNDYtNTJlZWRmNjU1YzRmIiwicmlkIjoiNWM2ZWI2YjQtYmI0Ny00M2NhLWJkMzctMzZlMmJhMTQxODJhIn0.lY6T-GNRRMXStfjd8fvBZvK3gYJGGyBXJAFaduxXdUkCZ4SlT2B1gDNTja8SIrpYXfsVsltj9xuZ8T4V8aVFCw';
 
-const client = createClient({
-  url: TURSO_URL,
-  authToken: TURSO_AUTH_TOKEN,
-});
+// Lazy Initialization Variable
+let clientInstance: any = null;
+
+// Helper to get client safely
+// This ensures we don't crash the app at the top-level import phase
+const getClient = () => {
+  if (!clientInstance) {
+    // Force HTTPS for web environment compatibility
+    // Browser cannot handle raw libsql:// directly without websockets/http proxy logic often handled better by https:// endpoint in this SDK
+    const httpUrl = TURSO_URL.replace('libsql://', 'https://');
+    
+    console.log("Initializing Database Connection to:", httpUrl);
+    
+    clientInstance = createClient({
+      url: httpUrl,
+      authToken: TURSO_AUTH_TOKEN,
+    });
+  }
+  return clientInstance;
+};
 
 // Event emitter for real-time updates
 export const storageEvent = new EventTarget();
@@ -22,8 +37,9 @@ const notifyChange = () => {
 
 export const initDB = async () => {
   try {
+    const db = getClient();
     // Create jobs table
-    await client.execute(`
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS jobs (
         id TEXT PRIMARY KEY,
         jobNo TEXT,
@@ -43,14 +59,14 @@ export const initDB = async () => {
     `);
 
     // Create staff table
-    await client.execute(`
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS staff (
         id TEXT PRIMARY KEY,
         name TEXT
       )
     `);
     
-    console.log("Database initialized");
+    console.log("Database initialized successfully");
   } catch (e) {
     console.error("Failed to initialize database:", e);
   }
@@ -60,7 +76,8 @@ export const initDB = async () => {
 
 export const getJobs = async (): Promise<SampleJob[]> => {
   try {
-    const result = await client.execute("SELECT * FROM jobs ORDER BY entryDate DESC");
+    const db = getClient();
+    const result = await db.execute("SELECT * FROM jobs ORDER BY entryDate DESC");
     return result.rows.map(row => ({
       id: row.id as string,
       jobNo: row.jobNo as string,
@@ -86,7 +103,8 @@ export const getJobs = async (): Promise<SampleJob[]> => {
 export const addJob = async (job: Omit<SampleJob, 'id'>) => {
   const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
   try {
-    await client.execute({
+    const db = getClient();
+    await db.execute({
       sql: `INSERT INTO jobs (
         id, jobNo, customerName, action, returnAddress, slotId, 
         entryDate, deadlineDate, staffName, status, notes
@@ -106,6 +124,7 @@ export const addJob = async (job: Omit<SampleJob, 'id'>) => {
 
 export const updateJob = async (id: string, updates: Partial<SampleJob>) => {
   try {
+    const db = getClient();
     // Construct dynamic update query
     const keys = Object.keys(updates);
     if (keys.length === 0) return;
@@ -113,7 +132,7 @@ export const updateJob = async (id: string, updates: Partial<SampleJob>) => {
     const setClause = keys.map(key => `${key} = ?`).join(', ');
     const args = [...Object.values(updates), id];
 
-    await client.execute({
+    await db.execute({
       sql: `UPDATE jobs SET ${setClause} WHERE id = ?`,
       args: args as any[]
     });
@@ -126,7 +145,8 @@ export const updateJob = async (id: string, updates: Partial<SampleJob>) => {
 
 export const clearAllJobs = async () => {
   try {
-    await client.execute("DELETE FROM jobs");
+    const db = getClient();
+    await db.execute("DELETE FROM jobs");
     notifyChange();
   } catch (e) {
     console.error("Error clearing jobs", e);
@@ -138,7 +158,8 @@ export const clearAllJobs = async () => {
 
 export const getStaff = async (): Promise<Staff[]> => {
   try {
-    const result = await client.execute("SELECT * FROM staff ORDER BY name ASC");
+    const db = getClient();
+    const result = await db.execute("SELECT * FROM staff ORDER BY name ASC");
     return result.rows.map(row => ({
       id: row.id as string,
       name: row.name as string
@@ -152,7 +173,8 @@ export const getStaff = async (): Promise<Staff[]> => {
 export const addStaff = async (name: string) => {
   const id = Date.now().toString();
   try {
-    await client.execute({
+    const db = getClient();
+    await db.execute({
       sql: "INSERT INTO staff (id, name) VALUES (?, ?)",
       args: [id, name]
     });
@@ -166,7 +188,8 @@ export const addStaff = async (name: string) => {
 
 export const updateStaff = async (id: string, name: string) => {
   try {
-    await client.execute({
+    const db = getClient();
+    await db.execute({
       sql: "UPDATE staff SET name = ? WHERE id = ?",
       args: [name, id]
     });
@@ -179,7 +202,8 @@ export const updateStaff = async (id: string, name: string) => {
 
 export const deleteStaff = async (id: string) => {
   try {
-    await client.execute({
+    const db = getClient();
+    await db.execute({
       sql: "DELETE FROM staff WHERE id = ?",
       args: [id]
     });
