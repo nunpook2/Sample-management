@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { updateJob } from '../storage';
 import { SampleJob, Staff } from '../types';
 import { 
   Calendar, 
@@ -66,21 +65,23 @@ const DeadlineList: React.FC<Props> = ({ jobs, staff }) => {
     }
 
     setLoading(true);
-    try {
-      await updateDoc(doc(db, "jobs", processingJob.id), {
-        status: 'COMPLETED',
-        exitDate: Date.now(),
-        exitStaff: exitStaff,
-        recipient: '-', 
-        notes: notes || 'จัดการตามกำหนด 12 วัน'
-      });
-      setProcessingJob(null);
-    } catch (err) {
-      console.error(err);
-      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => {
+      try {
+        updateJob(processingJob.id, {
+          status: 'COMPLETED',
+          exitDate: Date.now(),
+          exitStaff: exitStaff,
+          recipient: '-', 
+          notes: notes || 'จัดการตามกำหนด 12 วัน'
+        });
+        setProcessingJob(null);
+      } catch (err) {
+        console.error(err);
+        alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
   };
 
   return (

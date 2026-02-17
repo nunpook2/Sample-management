@@ -1,7 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { db } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { updateJob } from '../storage';
 import { SampleJob, ActionType, Staff } from '../types';
 import { 
   Trash2, 
@@ -10,7 +9,6 @@ import {
   Search, 
   ExternalLink, 
   X, 
-  User, 
   ClipboardList, 
   Info, 
   History,
@@ -84,23 +82,25 @@ const SlotGrid: React.FC<Props> = ({ jobs, staff }) => {
     }
 
     setLoading(true);
-    try {
-      await updateDoc(doc(db, "jobs", processingJob.id), {
-        status: 'COMPLETED',
-        exitDate: Date.now(),
-        exitStaff: exitStaff,
-        recipient: '-', 
-        notes: notes || 'จัดการปกติ'
-      });
-      setProcessingJob(null);
-      setExitStaff('');
-      setNotes('');
-    } catch (err) {
-      console.error(err);
-      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => {
+      try {
+        updateJob(processingJob.id, {
+          status: 'COMPLETED',
+          exitDate: Date.now(),
+          exitStaff: exitStaff,
+          recipient: '-', 
+          notes: notes || 'จัดการปกติ'
+        });
+        setProcessingJob(null);
+        setExitStaff('');
+        setNotes('');
+      } catch (err) {
+        console.error(err);
+        alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
   };
 
   const SlotCard: React.FC<{ type: ActionType; num: number }> = ({ type, num }) => {
@@ -341,7 +341,7 @@ const SlotGrid: React.FC<Props> = ({ jobs, staff }) => {
         </div>
       )}
 
-      {/* Manual Processing Modal - Fixed to Viewport and Scroll Lock applied */}
+      {/* Manual Processing Modal */}
       {processingJob && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-slideUp">

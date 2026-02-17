@@ -1,9 +1,8 @@
 
 import React, { useState } from 'react';
-import { db } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { addJob } from '../storage';
 import { SampleJob, Staff, ActionType } from '../types';
-import { PlusCircle, AlertTriangle, CheckCircle2, Box, Info, Trash2, FlaskConical, ChevronRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Box, Info, Trash2, FlaskConical, ChevronRight } from 'lucide-react';
 
 interface Props {
   staff: Staff[];
@@ -50,35 +49,38 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
     }
 
     setLoading(true);
-    try {
-      const entryDate = Date.now();
-      const deadlineDate = isTestMode 
-        ? entryDate - (1000 * 60 * 60 * 24)
-        : entryDate + (12 * 24 * 60 * 60 * 1000);
+    // Simulate slight delay for UX
+    setTimeout(() => {
+      try {
+        const entryDate = Date.now();
+        const deadlineDate = isTestMode 
+          ? entryDate - (1000 * 60 * 60 * 24)
+          : entryDate + (12 * 24 * 60 * 60 * 1000);
 
-      await addDoc(collection(db, "jobs"), {
-        jobNo: jobNo.trim().toUpperCase(),
-        customerName: '',
-        action,
-        returnAddress: '',
-        slotId: assignedSlotId,
-        entryDate: isTestMode ? entryDate - (13 * 24 * 60 * 60 * 1000) : entryDate,
-        deadlineDate,
-        staffName: selectedStaff,
-        status: 'PENDING'
-      });
+        addJob({
+          jobNo: jobNo.trim().toUpperCase(),
+          customerName: '',
+          action,
+          returnAddress: '',
+          slotId: assignedSlotId,
+          entryDate: isTestMode ? entryDate - (13 * 24 * 60 * 60 * 1000) : entryDate,
+          deadlineDate,
+          staffName: selectedStaff,
+          status: 'PENDING'
+        });
 
-      setSuccessData({ 
-        jobNo: jobNo.trim().toUpperCase(), 
-        slotId: assignedSlotId,
-        action: action 
-      });
-    } catch (err) {
-      console.error(err);
-      setError('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-    } finally {
-      setLoading(false);
-    }
+        setSuccessData({ 
+          jobNo: jobNo.trim().toUpperCase(), 
+          slotId: assignedSlotId,
+          action: action 
+        });
+      } catch (err) {
+        console.error(err);
+        setError('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      } finally {
+        setLoading(false);
+      }
+    }, 500);
   };
 
   const resetForm = () => {
@@ -218,7 +220,7 @@ const SampleEntry: React.FC<Props> = ({ staff, jobs, onComplete }) => {
             </div>
           </div>
 
-          {/* Test Mode Toggle - Slightly smaller on mobile */}
+          {/* Test Mode Toggle */}
           <div className="pt-2">
             <label className="flex items-center gap-4 cursor-pointer p-4 rounded-2xl bg-slate-900 text-white active:bg-black transition-colors">
               <input 
