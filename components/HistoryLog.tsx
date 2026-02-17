@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { SampleJob } from '../types';
 import { Search, Calendar, ArrowRight, Clock, FileText, CheckCircle2 } from 'lucide-react';
@@ -30,6 +31,24 @@ const HistoryLog: React.FC<Props> = ({ jobs }) => {
         return dateB - dateA;
       });
   }, [jobs, filter, search]);
+
+  const formatDate = (timestamp?: number) => {
+    if (!timestamp) return '-';
+    try {
+      return new Date(timestamp).toLocaleDateString('th-TH');
+    } catch (e) {
+      return '-';
+    }
+  };
+
+  const formatTime = (timestamp?: number) => {
+    if (!timestamp) return '';
+    try {
+      return new Date(timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return '';
+    }
+  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -96,7 +115,7 @@ const HistoryLog: React.FC<Props> = ({ jobs }) => {
             <div className="flex flex-col md:flex-row gap-3 text-xs bg-gray-50 p-3 rounded-xl border border-gray-100">
                <div className="flex-1">
                  <div className="text-gray-400 font-bold mb-1 flex items-center gap-1"><Calendar size={12}/> รับเข้า</div>
-                 <div className="font-medium text-gray-700">{new Date(job.entryDate).toLocaleDateString('th-TH, { hour: "2-digit", minute: "2-digit" }')}</div>
+                 <div className="font-medium text-gray-700">{formatDate(job.entryDate)} {formatTime(job.entryDate)}</div>
                  <div className="text-[10px] text-gray-400 mt-0.5">โดย: {job.staffName}</div>
                </div>
                
@@ -110,11 +129,11 @@ const HistoryLog: React.FC<Props> = ({ jobs }) => {
                  </div>
                  {job.status === 'COMPLETED' ? (
                    <>
-                     <div className="font-medium text-green-600">{new Date(job.exitDate!).toLocaleDateString('th-TH, { hour: "2-digit", minute: "2-digit" }')}</div>
+                     <div className="font-medium text-green-600">{formatDate(job.exitDate)} {formatTime(job.exitDate)}</div>
                      <div className="text-[10px] text-gray-400 mt-0.5">โดย: {job.exitStaff}</div>
                    </>
                  ) : (
-                   <div className="font-medium text-amber-600">{new Date(job.deadlineDate).toLocaleDateString('th-TH')}</div>
+                   <div className="font-medium text-amber-600">{formatDate(job.deadlineDate)}</div>
                  )}
                </div>
             </div>
